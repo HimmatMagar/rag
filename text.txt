@@ -1,0 +1,14 @@
+A blockchain is a distributed ledger with growing lists of records (blocks)
+that are securely linked together via cryptographic hashes.
+Each block contains a cryptographic hash of the previous block, a timestamp
+and transaction data (generally represented as a Merkle tree, where data nodes are
+represented by leaves). Since each block contains information about the previous block,
+they effectively form a chain (viz. linked list data structure), with each additional
+block linking to the ones before it. Consequently, blockchain transactions are resistant
+to alteration because, once recorded, the data in any given block cannot be changed retroactively
+without altering all subsequent blocks and obtaining network consensus to accept these changes.
+Blockchains are typically managed by a peer-to-peer (P2P) computer network for use as a public
+distributed ledger, where nodes collectively adhere to a consensus algorithm protocol to add and
+validate new transaction blocks. Although blockchain records are not unalterable, since blockchain
+forks are possible, blockchains may be considered secure by design and exemplify a distributed computing
+system with high Byzantine fault tolerance.
