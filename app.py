@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint, HuggingFaceEmbeddings
 
 
 load_dotenv()
@@ -14,6 +14,13 @@ llm = HuggingFaceEndpoint(
     max_new_tokens=50
 )
 
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+vector = embeddings.embed_query("What is artificial intelligence?")
+print(vector)
+print(len(vector))
 
 model = ChatHuggingFace(llm=llm)
 
