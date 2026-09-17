@@ -14,8 +14,17 @@ llm = HuggingFaceEndpoint(
     max_new_tokens=50
 )
 
+print('1: for angry mode')
+print('2: for a very helpful ai teacher')
+
+choice = int(input("Enter choice: "))
+if choice == 1:
+    mode = "You are the angry ai"
+elif choice == 2:
+    mode = "You are the very helpful ai teacher to students"
+
 message = [
-    SystemMessage(content="You are an AI teacher.")
+    SystemMessage(content=mode)
 ]
 
 model = ChatHuggingFace(llm=llm)
@@ -33,3 +42,4 @@ while True:
     message.append(AIMessage(content=response.content))
 
     print("Assistant:", response.content)
+
