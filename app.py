@@ -1,28 +1,25 @@
 import os
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from dotenv import load_dotenv
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint, HuggingFaceEmbeddings
-
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.runnables import RunnableParallel, RunnableSequence
 
 load_dotenv()
 
+model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", max_output_tokens=50)
 
-llm = HuggingFaceEndpoint(
-    repo_id='deepseek-ai/DeepSeek-R1',
-    huggingfacehub_api_token=os.getenv("HUGGINGFACE_ACCESS_TOKEN"),
-    task='text-generation',
-    temperature=0.5,
-    max_new_tokens=50
-)
+short_prompt = PromptTemplate.from_template("Explain the {topic} in 1 short sentence")
+long_prompt = PromptTemplate.from_template("Explain the {topic} in 2 short sentence")
 
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+output = StrOutputParser()
 
-vector = embeddings.embed_query("What is artificial intelligence?")
-print(vector)
-print(len(vector))
 
-model = ChatHuggingFace(llm=llm)
+chain = RunnableParallel({
+    "short": RunnableSequence(short_prompt, model, output),
+    "long": long_prompt | model | output
+})
+result = chain.invoke("Machine learning")
 
-response = model.invoke("what is machine learning")
-print(response.content)
+print(result)
