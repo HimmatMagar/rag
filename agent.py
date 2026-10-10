@@ -51,4 +51,24 @@ def get_news(city: str) -> str:
     return news_result
 
 
+## Creating agents
+model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", max_output_tokens=60)
 
+tools = {
+    "get_weather": get_weather,
+    "get_news": get_news
+}
+
+llm_with_tools = model.bind_tools([get_weather, get_news])
+
+
+message = []
+
+print("City Expert chat bot")
+print("type quit to end conversations")
+
+while True:
+    user_input = input("User: ")
+    if user_input.lower() == 'quit':
+        break
+    message.append(HumanMessage(user_input))
