@@ -1,10 +1,14 @@
 import os
 import requests
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from tavily import TavilyClient
 from langchain.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, ToolMessage
+from langchain.agents import create_agent
+from langchain.agents.middleware import wrap_tool_call
+
 
 load_dotenv()
 
@@ -52,61 +56,50 @@ def get_news(city: str) -> str:
     return news_result
 
 
-def get_text(content):
-    """Return plain text from a string or a list of content blocks."""
-    if isinstance(content, str):
-        return content
-    return "".join(
-        block["text"] if isinstance(block, dict) and block.get("type") == "text" else ""
-        for block in content
+## Creating agents
+model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite")
+
+
+@wrap_tool_call
+def human_approval(request, handler):
+    """Ask human before calling any tools"""
+    tool_name = request.tool_call['name']
+    confirm = input(
+        f"Agent wants to use '{tool_name}'. Approve? (yes/no): "
+    ).strip().lower()
+
+    if confirm == 'yes':
+        return handler(request)
+    
+    return ToolMessage(
+        content=f"User rejected the '{tool_name}' tool call.",
+        tool_call_id = request.tool_call['id']
     )
 
-## Creating agents
-model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", max_output_tokens=60)
+agent = create_agent(
+    model=model,
+    tools=[get_weather, get_news],
+    system_prompt="You are a helpful assistant. Be concise and accurate.",
+    middleware=[human_approval]
+)
 
-tools = {
-    "get_weather": get_weather,
-    "get_news": get_news
-}
-
-llm_with_tools = model.bind_tools([get_weather, get_news])
-
-
-message = []
-
-print("=" * 40)
-print("  City Expert Chatbot")
-print("  Type 'quit' to end the conversation")
-print("=" * 40)
+print("AI Agent: Type 'quit' to end conversations")
 
 while True:
-    user_input = input("User: ")
-    if user_input.lower() == 'quit':
-        print("Goodbye!")
+    query = input("user: ")
+    if query.lower() == "quit":
+        print("Thank you for using me...")
         break
-    message.append(HumanMessage(content=user_input))
 
-    while True:
-        result = llm_with_tools.invoke(message)
-        message.append(result)
+    result = agent.invoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ]
+        } 
+    )
+    print(result['messages'][-1].text)
 
-        if not result.tool_calls:
-            print(f"\nAnswer: {get_text(result.content)}")
-            break
-
-        for tool_call in result.tool_calls:
-            tool_name = tool_call["name"]
-            tool_args = tool_call["args"]
-
-            print(f"\n[Tool request] {tool_name}({tool_args})")
-            confirm = input("Approve? (yes/no): ").strip().lower()
-
-            if confirm == "yes":
-                output = tools[tool_name].invoke(tool_args)
-            else:
-                output = "The user denied permission to use this tool."
-
-            message.append(
-                ToolMessage(content=str(output), tool_call_id=tool_call["id"])
-            )
-        continue
