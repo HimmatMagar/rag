@@ -4,13 +4,13 @@ from dotenv import load_dotenv
 from tavily import TavilyClient
 from langchain.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 
 load_dotenv()
 
 
 ## Creating tools
-@tool("get weather")
+@tool
 def get_weather(city: str) -> str:
     """Get the weather of city include: temprature, weather situation and humidity"""
     API_KEY = os.getenv("OPENWEATHER_API_KEY")
@@ -29,8 +29,9 @@ def get_weather(city: str) -> str:
     return f"Current weather in {city} are temp: {temp}°C, weather info: {info}, humidity: {humidity}"
 
 
-@tool("get news")
+@tool
 def get_news(city: str) -> str:
+    """Get the weather of any city """
     client = TavilyClient(
         api_key=os.getenv("TAVILY_API_KEY")
     )
@@ -51,6 +52,15 @@ def get_news(city: str) -> str:
     return news_result
 
 
+def get_text(content):
+    """Return plain text from a string or a list of content blocks."""
+    if isinstance(content, str):
+        return content
+    return "".join(
+        block["text"] if isinstance(block, dict) and block.get("type") == "text" else ""
+        for block in content
+    )
+
 ## Creating agents
 model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", max_output_tokens=60)
 
@@ -64,11 +74,39 @@ llm_with_tools = model.bind_tools([get_weather, get_news])
 
 message = []
 
-print("City Expert chat bot")
-print("type quit to end conversations")
+print("=" * 40)
+print("  City Expert Chatbot")
+print("  Type 'quit' to end the conversation")
+print("=" * 40)
 
 while True:
     user_input = input("User: ")
     if user_input.lower() == 'quit':
+        print("Goodbye!")
         break
-    message.append(HumanMessage(user_input))
+    message.append(HumanMessage(content=user_input))
+
+    while True:
+        result = llm_with_tools.invoke(message)
+        message.append(result)
+
+        if not result.tool_calls:
+            print(f"\nAnswer: {get_text(result.content)}")
+            break
+
+        for tool_call in result.tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
+
+            print(f"\n[Tool request] {tool_name}({tool_args})")
+            confirm = input("Approve? (yes/no): ").strip().lower()
+
+            if confirm == "yes":
+                output = tools[tool_name].invoke(tool_args)
+            else:
+                output = "The user denied permission to use this tool."
+
+            message.append(
+                ToolMessage(content=str(output), tool_call_id=tool_call["id"])
+            )
+        continue
