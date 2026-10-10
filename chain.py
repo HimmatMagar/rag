@@ -1,50 +1,38 @@
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+from rich import print
 from dotenv import load_dotenv
-from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-
+from langchain.tools import tool
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 
 load_dotenv()
 
-# Prompt
-prompt = PromptTemplate(
-    template="Generate 5 interesting fact about {topic}",
-    input_variables=['topic']
-)
+@tool
+def get_length(query: str) -> str:
+    """Search the web for information."""
+    return f"Results for: {len(query)}"
 
-# ## LLM
-llm = HuggingFaceEndpoint(
-    repo_id="meta-llama/Llama-3.1-8B-Instruct",
-    task="text-generation"
-)
+tools = {
+    "get_length": get_length
+}
 
-model = ChatHuggingFace(llm=llm)
+model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", max_output_tokens=60)
 
-# ## Plain output
-parser = StrOutputParser()
+# ### Binding the tool
+tool_model = model.bind_tools([get_length])
 
+message = []
 
-# ### Simple Chain
-chain = prompt | model | parser
+prompt = input("user: ")
+query = HumanMessage(prompt)
+message.append(query)
 
-response = chain.invoke({'topic': "nepal"})
-print(response)
+result = tool_model.invoke(message)
+message.append(result)
 
-chain.get_graph().print_ascii()
+if result.tool_calls:
+    tool_name = result.tool_calls[0]['name']
+    tool_result = tools[tool_name].invoke(result.tool_calls[0])
+    message.append(tool_result)
 
-
-### Sequential chain
-prompt1 = PromptTemplate(
-    template="Generate a detail report about {topic}",
-    input_variables=['topic']
-)
-
-prompt2 = PromptTemplate(
-    template="Generate 5 pointer summary from the following {text}",
-    input_variables=['text']
-)
-
-chain = prompt1 | model | parser | prompt2 | model | parser
-
-response = chain.invoke({'topic': "education in nepal"})
+response = model.invoke(message)
 print(response)
